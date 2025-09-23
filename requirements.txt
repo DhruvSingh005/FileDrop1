@@ -3,3 +3,8 @@ qrcode
 Pillow
 pyrebase4
 requests
+Flask
+Pillow
+pyrebase4
+qrcode
+requests

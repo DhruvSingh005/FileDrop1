@@ -197,6 +197,6 @@ def presenter_view(code):
 if __name__ == '__main__':
     init_db()
     try:
-        app.run(host='0.0.0.0', port=8080)
+        app.run(host='0.0.0.0', port=5000)
     except Exception as e:
         print("An error occurred during startup:", e, file=sys.stderr)
