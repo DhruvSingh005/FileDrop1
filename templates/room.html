@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room {{ room_code }}</title>
+    <style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
+    }
+    .container {
+        max-width: 90%;
+        width: 100%;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        box-sizing: border-box;
+    }
+    .presenter-mode-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #f4f4f4;
+        padding: 20px;
+        box-sizing: border-box;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    .presenter-mode-container.active {
+        display: flex;
+    }
+    h1 {
+        color: #333;
+    }
+    #room-code-display {
+        font-size: 2em;
+        font-weight: bold;
+        color: #007bff;
+        letter-spacing: 2px;
+        margin-bottom: 20px;
+    }
+    .qr-code-section {
+        margin-bottom: 20px;
+    }
+    .presenter-mode-btn {
+        background-color: #17a2b8;
+        color: white;
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+    .presenter-mode-btn:hover {
+        background-color: #138496;
+    }
+    .button-group {
+        display: flex;
+        flex-direction: column;   /* stack vertically on mobile */
+        align-items: center;
+        width: 100%;
+        gap: 15px;
+    }
+    .button-group a,
+    .button-group button {
+        display: block;
+        padding: 12px 20px;
+        background-color: #007bff;
+        color: white;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        text-decoration: none;
+        width: 100%;
+        max-width: 320px;
+    }
+    .button-group a:hover,
+    .button-group button:hover {
+        background-color: #0056b3;
+    }
+    @media (min-width: 600px) {
+        .button-group {
+            flex-direction: row;   /* side by side on desktop */
+            justify-content: center;
+        }
+        .button-group a,
+        .button-group button {
+            width: auto;
+        }
+    }
+    form {
+        margin-top: 20px;
+    }
+    input[type="file"] {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    button:hover {
+        background-color: #218838;
+    }
+    hr {
+        border: 0;
+        height: 1px;
+        background: #ccc;
+        margin: 30px 0;
+    }
+    h2 {
+        color: #555;
+    }
+    ul {
+        list-style: none;
+        padding: 0;
+        width: 100%;
+    }
+    li {
+        background-color: #f9f9f9;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    li > span {
+        word-break: break-all;
+        margin-right: 10px;
+    }
+    li > div {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+    a {
+        text-decoration: none;
+        color: #007bff;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+        .container {
+            max-width: 100%;
+            padding: 10px;
+        }
+    }
+</style>
+</head>
+<body>
+    <div class="container" id="manage-view">
+        <h1>Room Code:</h1>
+        <p id="room-code-display">{{ room_code }}</p>
+
+        {% if is_presenter %}
+        <div class="qr-code-section">
+            <p>Scan this QR code to join:</p>
+            <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Code" style="width: 200px; height: 200px; margin-top: 10px;">
+            <br>
+            <button class="presenter-mode-btn" onclick="togglePresenterMode()">Switch to Presenter View</button>
+        </div>
+        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <button type="submit">Upload File</button>
+        </form>
+        {% else %}
+        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <button type="submit">Upload File</button>
+        </form>
+        {% endif %}
+
+        <hr>
+
+        <h2>Uploaded Files</h2>
+        <ul id="file-list">
+            </ul>
+    </div>
+
+    <div class="presenter-mode-container" id="presenter-view">
+        <h1 style="text-align: center;">Uploaded Files</h1>
+        <ul id="presenter-file-list" style="width: 100%;">
+            </ul>
+        <button class="presenter-mode-btn" onclick="togglePresenterMode()">Exit Presenter View</button>
+    </div>
+
+    <script>
+        const fileList = document.getElementById('file-list');
+        const presenterFileList = document.getElementById('presenter-file-list');
+        const manageView = document.getElementById('manage-view');
+        const presenterView = document.getElementById('presenter-view');
+        const roomCode = "{{ room_code }}";
+
+        function updateFileLists(files, is_presenter) {
+            fileList.innerHTML = '';
+            presenterFileList.innerHTML = '';
+            const filesData = files || [];
+
+            if (filesData.length > 0) {
+                filesData.forEach(file => {
+                    const manageLi = document.createElement('li');
+                    const deleteBtn = is_presenter ? `
+                        <form action="/delete_file/${roomCode}" method="post" style="display:inline;">
+                            <input type="hidden" name="filename" value="${file.filename}">
+                            <button type="submit" style="color:red; background:none; border:none; cursor:pointer;">Delete</button>
+                        </form>` : '';
+                    manageLi.innerHTML = `
+                        <span>${file.filename}</span>
+                        <div>
+                            <a href="/download_file?room_code=${roomCode}&filename=${file.filename}" target="_blank">Download</a>
+                            ${deleteBtn}
+                        </div>
+                    `;
+                    fileList.appendChild(manageLi);
+
+                    const presenterLi = document.createElement('li');
+                    presenterLi.innerHTML = `
+                        <span>${file.filename}</span>
+                        <a href="/download_file?room_code=${roomCode}&filename=${file.filename}" target="_blank">Download</a>
+                    `;
+                    presenterFileList.appendChild(presenterLi);
+                });
+            } else {
+                fileList.innerHTML = '<li>No files have been uploaded yet.</li>';
+                presenterFileList.innerHTML = '<li>No files have been uploaded yet.</li>';
+            }
+        }
+
+        async function fetchFiles() {
+            try {
+                const response = await fetch(`/files/${roomCode}`);
+                const data = await response.json();
+                updateFileLists(data.files, data.is_presenter);
+            } catch (error) {
+                console.error('Error fetching files:', error);
+            }
+        }
+
+        function togglePresenterMode() {
+            if (presenterView.classList.contains('active')) {
+                presenterView.classList.remove('active');
+                manageView.style.display = 'block';
+            } else {
+                presenterView.classList.add('active');
+                manageView.style.display = 'none';
+            }
+        }
+
+        setInterval(fetchFiles, 3000);
+        fetchFiles();
+    </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+Flask
+qrcode
+Pillow
+pyrebase4
+requests

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presenter View</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 90%;
+            width: 100%;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #333;
+        }
+        #room-code-display {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+        }
+        li {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        li > span {
+            word-break: break-all;
+            margin-right: 10px;
+        }
+        li > div {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+        a {
+            text-decoration: none;
+            color: #007bff;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                max-width: 100%;
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Room Code: {{ room_code }}</h1>
+        <hr>
+        <h2>Uploaded Files</h2>
+        <ul id="presenter-file-list" style="width: 100%;">
+            {% for filename in files %}
+            <li>
+                <span>{{ filename }}</span>
+                <a href="/download_file?room_code={{ room_code }}&filename={{ filename }}" target="_blank">Download</a>
+            </li>
+            {% else %}
+            <li>No files have been uploaded yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
