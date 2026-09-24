@@ -230,7 +230,6 @@
 
             if (filesData.length > 0) {
                 filesData.forEach(file => {
-                    // --- UPDATED: Use the file.file_url provided by the API ---
                     const downloadUrl = file.file_url; 
 
                     const manageLi = document.createElement('li');
@@ -239,6 +238,7 @@
                             <input type="hidden" name="filename" value="${file.filename}">
                             <button type="submit" style="color:red; background:none; border:none; cursor:pointer;">Delete</button>
                         </form>` : '';
+                    
                     manageLi.innerHTML = `
                         <span>${file.filename}</span>
                         <div>
@@ -252,40 +252,6 @@
                     presenterLi.innerHTML = `
                         <span>${file.filename}</span>
                         <a href="${downloadUrl}" target="_blank">Download</a>
-                    `;
-                    presenterFileList.appendChild(presenterLi);
-                    // --- END UPDATED SECTION ---
-                });
-            } else {
-                fileList.innerHTML = '<li>No files have been uploaded yet.</li>';
-                presenterFileList.innerHTML = '<li>No files have been uploaded yet.</li>';
-            }
-        } {
-            fileList.innerHTML = '';
-            presenterFileList.innerHTML = '';
-            const filesData = files || [];
-
-            if (filesData.length > 0) {
-                filesData.forEach(file => {
-                    const manageLi = document.createElement('li');
-                    const deleteBtn = is_presenter ? `
-                        <form action="/delete_file/${roomCode}" method="post" style="display:inline;">
-                            <input type="hidden" name="filename" value="${file.filename}">
-                            <button type="submit" style="color:red; background:none; border:none; cursor:pointer;">Delete</button>
-                        </form>` : '';
-                    manageLi.innerHTML = `
-                        <span>${file.filename}</span>
-                        <div>
-                            <a href="/download_file?room_code=${roomCode}&filename=${file.filename}" target="_blank">Download</a>
-                            ${deleteBtn}
-                        </div>
-                    `;
-                    fileList.appendChild(manageLi);
-
-                    const presenterLi = document.createElement('li');
-                    presenterLi.innerHTML = `
-                        <span>${file.filename}</span>
-                        <a href="/download_file?room_code=${roomCode}&filename=${file.filename}" target="_blank">Download</a>
                     `;
                     presenterFileList.appendChild(presenterLi);
                 });
