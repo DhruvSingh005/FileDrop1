@@ -70,41 +70,6 @@
     .presenter-mode-btn:hover {
         background-color: #138496;
     }
-    .button-group {
-        display: flex;
-        flex-direction: column;   /* stack vertically on mobile */
-        align-items: center;
-        width: 100%;
-        gap: 15px;
-    }
-    .button-group a,
-    .button-group button {
-        display: block;
-        padding: 12px 20px;
-        background-color: #007bff;
-        color: white;
-        border-radius: 6px;
-        font-size: 16px;
-        font-weight: bold;
-        text-align: center;
-        text-decoration: none;
-        width: 100%;
-        max-width: 320px;
-    }
-    .button-group a:hover,
-    .button-group button:hover {
-        background-color: #0056b3;
-    }
-    @media (min-width: 600px) {
-        .button-group {
-            flex-direction: row;   /* side by side on desktop */
-            justify-content: center;
-        }
-        .button-group a,
-        .button-group button {
-            width: auto;
-        }
-    }
     form {
         margin-top: 20px;
     }
@@ -114,8 +79,9 @@
         border-radius: 5px;
         width: 100%;
         box-sizing: border-box;
+        margin-bottom: 10px;
     }
-    button {
+    button[type="submit"] {
         padding: 10px 20px;
         font-size: 16px;
         background-color: #28a745;
@@ -126,7 +92,7 @@
         width: 100%;
         box-sizing: border-box;
     }
-    button:hover {
+    button[type="submit"]:hover {
         background-color: #218838;
     }
     hr {
@@ -153,28 +119,80 @@
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
+        gap: 15px;
     }
     li > span {
         word-break: break-all;
-        margin-right: 10px;
+        font-weight: 500;
+        color: #333;
     }
-    li > div {
+    
+    /* --- ACTION BUTTON STYLES --- */
+    .action-buttons {
         display: flex;
         gap: 10px;
+        align-items: center;
         margin-left: auto;
     }
-    a {
+    .action-buttons form {
+        margin: 0; 
+        display: flex;
+        align-items: center;
+    }
+    .btn-view {
+        background-color: #17a2b8; /* Teal color for View */
+        color: white;
+        padding: 8px 15px;
+        border-radius: 5px;
         text-decoration: none;
-        color: #007bff;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.2s;
     }
-    a:hover {
-        text-decoration: underline;
+    .btn-view:hover {
+        background-color: #138496;
+        text-decoration: none;
     }
+    .btn-download {
+        background-color: #007bff;
+        color: white;
+        padding: 8px 15px;
+        border-radius: 5px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    }
+    .btn-download:hover {
+        background-color: #0056b3;
+        text-decoration: none;
+    }
+    .btn-delete {
+        background-color: #dc3545 !important;
+        color: white !important;
+        padding: 8px 15px !important;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px !important;
+        font-weight: bold;
+        width: auto !important; 
+        transition: background-color 0.2s;
+    }
+    .btn-delete:hover {
+        background-color: #c82333 !important;
+    }
+    /* ------------------------------------- */
 
     @media (max-width: 600px) {
         .container {
             max-width: 100%;
             padding: 10px;
+        }
+        .action-buttons {
+            width: 100%;
+            justify-content: flex-start;
+            margin-left: 0;
         }
     }
 </style>
@@ -191,16 +209,12 @@
             <br>
             <button class="presenter-mode-btn" onclick="togglePresenterMode()">Switch to Presenter View</button>
         </div>
-        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required>
-            <button type="submit">Upload File</button>
-        </form>
-        {% else %}
-        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required>
-            <button type="submit">Upload File</button>
-        </form>
         {% endif %}
+
+        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <button type="submit">Upload File</button>
+        </form>
 
         <hr>
 
@@ -230,19 +244,22 @@
 
             if (filesData.length > 0) {
                 filesData.forEach(file => {
-                    const downloadUrl = file.file_url; 
+                    const viewUrl = file.file_url; 
+                    const downloadUrl = file.file_url + "?download="; // Forces the browser to download instead of opening
 
                     const manageLi = document.createElement('li');
+                    
                     const deleteBtn = is_presenter ? `
-                        <form action="/delete_file/${roomCode}" method="post" style="display:inline;">
+                        <form action="/delete_file/${roomCode}" method="post">
                             <input type="hidden" name="filename" value="${file.filename}">
-                            <button type="submit" style="color:red; background:none; border:none; cursor:pointer;">Delete</button>
+                            <button type="submit" class="btn-delete">Delete</button>
                         </form>` : '';
                     
                     manageLi.innerHTML = `
                         <span>${file.filename}</span>
-                        <div>
-                            <a href="${downloadUrl}" target="_blank">Download</a>
+                        <div class="action-buttons">
+                            <a href="${viewUrl}" target="_blank" class="btn-view">View</a>
+                            <a href="${downloadUrl}" class="btn-download">Download</a>
                             ${deleteBtn}
                         </div>
                     `;
@@ -251,13 +268,16 @@
                     const presenterLi = document.createElement('li');
                     presenterLi.innerHTML = `
                         <span>${file.filename}</span>
-                        <a href="${downloadUrl}" target="_blank">Download</a>
+                        <div class="action-buttons">
+                            <a href="${viewUrl}" target="_blank" class="btn-view">View</a>
+                            <a href="${downloadUrl}" class="btn-download">Download</a>
+                        </div>
                     `;
                     presenterFileList.appendChild(presenterLi);
                 });
             } else {
-                fileList.innerHTML = '<li>No files have been uploaded yet.</li>';
-                presenterFileList.innerHTML = '<li>No files have been uploaded yet.</li>';
+                fileList.innerHTML = '<li style="justify-content: center; color: #777;">No files have been uploaded yet.</li>';
+                presenterFileList.innerHTML = '<li style="justify-content: center; color: #777;">No files have been uploaded yet.</li>';
             }
         }
 
