@@ -54,9 +54,9 @@ def room(code):
     qr_img.save(buffer, 'PNG')
     qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-    # Fetch files for this room
-    files_response = supabase.table('files').select('filename').eq('room_code', code).execute()
-    room_files = [row['filename'] for row in files_response.data]
+    # Fetch files for this room (fetch all data and keep it as a dictionary)
+    files_response = supabase.table('files').select('*').eq('room_code', code).execute()
+    room_files = files_response.data
     
     return render_template('room.html', room_code=code, files=room_files, is_presenter=is_presenter, qr_base64=qr_base64)
 
@@ -174,8 +174,9 @@ def presenter_view(code):
         room_data = room_check.data[0]
         is_presenter = (session.get('presenter_key') == room_data['presenter_key'])
         
-        files_response = supabase.table('files').select('filename').eq('room_code', code).execute()
-        files_list = [row['filename'] for row in files_response.data]
+        # Fetch all file data, keeping the dictionary structure
+        files_response = supabase.table('files').select('*').eq('room_code', code).execute()
+        files_list = files_response.data
         
         return render_template('presenter_view.html', room_code=code, files=files_list, is_presenter=is_presenter)
         
