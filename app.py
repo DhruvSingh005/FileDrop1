@@ -14,8 +14,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback_secret_key_change_in_production')
 
 # === SUPABASE CONFIGURATION ===
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+url: str = "https://qzpgqlfujfyjfstfxqgj.supabase.co"
+key: str = "sb_publishable_3AmtfHi9VLEZFoBdmGAHGQ_uIHl9lkO"
 supabase: Client = create_client(url, key)
 
 @app.route('/')
