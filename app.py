@@ -15,7 +15,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'fallback_secret_key_change_in_pro
 
 # === SUPABASE CONFIGURATION ===
 url: str = "https://qzpgqlfujfyjfstfxqgj.supabase.co"
-key: str = "sb_publishable_3AmtfHi9VLEZFoBdmGAHGQ_uIHl9lkO"
+key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q"
 supabase: Client = create_client(url, key)
 
 @app.route('/')
