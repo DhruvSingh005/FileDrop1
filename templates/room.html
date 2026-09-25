@@ -369,6 +369,7 @@
 
                 promptText.innerHTML = "Drag & Drop files here<br><br><span style='font-size: 14px; font-weight: normal;'>or click to browse</span>";
                 dropZone.style.pointerEvents = "auto";
+                fetchFiles();
 
             } catch (error) {
                 console.error("Upload error:", error);
