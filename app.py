@@ -4,6 +4,7 @@ import string
 from io import BytesIO
 import qrcode
 import base64
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, redirect, url_for, request, session, jsonify
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -211,3 +212,34 @@ def presenter_view(code):
         return render_template('presenter_view.html', room_code=code, files=files_list, is_presenter=is_presenter)
         
     return "Room not found."
+
+@app.route('/cleanup-old-rooms-secret-task')
+def cleanup_old_rooms():
+    try:
+        # Calculate the exact time 12 hours ago
+        time_threshold = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
+        
+        # Find all rooms created before the 12-hour threshold
+        old_rooms = supabase.table('rooms').select('room_code').lt('created_at', time_threshold).execute()
+        
+        deleted_count = 0
+        for room in old_rooms.data:
+            code = room['room_code']
+            
+            # 1. Find all files associated with the old room
+            files_response = supabase.table('files').select('storage_path').eq('room_code', code).execute()
+            storage_paths = [row['storage_path'] for row in files_response.data]
+            
+            # 2. Delete files from Supabase Storage
+            if storage_paths:
+                supabase.storage.from_("filedrop").remove(storage_paths)
+                
+            # 3. Delete from database
+            supabase.table('files').delete().eq('room_code', code).execute()
+            supabase.table('rooms').delete().eq('room_code', code).execute()
+            
+            deleted_count += 1
+            
+        return jsonify({"status": "success", "rooms_deleted": deleted_count})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
