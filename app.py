@@ -138,6 +138,35 @@ def delete_file(code):
     
     return "Unauthorized access."
 
+@app.route('/close_room/<code>', methods=['POST'])
+def close_room(code):
+    room_check = supabase.table('rooms').select('presenter_key').eq('room_code', code).execute()
+    if len(room_check.data) == 0:
+        return "Room not found."
+    
+    room_data = room_check.data[0]
+    is_presenter = (session.get('presenter_key') == room_data['presenter_key'])
+    
+    if is_presenter:
+        # 1. Get all file paths for this room
+        files_response = supabase.table('files').select('storage_path').eq('room_code', code).execute()
+        storage_paths = [row['storage_path'] for row in files_response.data]
+        
+        # 2. Delete all files physically from Supabase Storage
+        if storage_paths:
+            supabase.storage.from_("filedrop").remove(storage_paths)
+            
+        # 3. Delete file metadata from the database
+        supabase.table('files').delete().eq('room_code', code).execute()
+        
+        # 4. Delete the room itself
+        supabase.table('rooms').delete().eq('room_code', code).execute()
+        
+        # Redirect the presenter back to the home page
+        return redirect(url_for('home'))
+        
+    return "Unauthorized access."
+
 @app.route('/files/<code>')
 def get_files(code):
     room_check = supabase.table('rooms').select('presenter_key').eq('room_code', code).execute()
@@ -147,9 +176,10 @@ def get_files(code):
         is_presenter = (session.get('presenter_key') == room_data['presenter_key'])
         
         files_response = supabase.table('files').select('filename, file_url').eq('room_code', code).execute()
-        return jsonify({'files': files_response.data, 'is_presenter': is_presenter})
+        return jsonify({'room_exists': True, 'files': files_response.data, 'is_presenter': is_presenter})
         
-    return jsonify({'files': [], 'is_presenter': False})
+    # Tell the frontend the room no longer exists
+    return jsonify({'room_exists': False, 'files': [], 'is_presenter': False})
 
 @app.route('/download_file')
 def download_file_route():

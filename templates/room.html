@@ -70,6 +70,25 @@
     .presenter-mode-btn:hover {
         background-color: #138496;
     }
+    
+    /* --- NEW CLOSE ROOM BUTTON --- */
+    .btn-close-room {
+        background-color: #dc3545;
+        color: white;
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 15px;
+    }
+    .btn-close-room:hover {
+        background-color: #c82333;
+    }
+    /* ----------------------------- */
+
     form {
         margin-top: 20px;
     }
@@ -140,7 +159,7 @@
         align-items: center;
     }
     .btn-view {
-        background-color: #17a2b8; /* Teal color for View */
+        background-color: #17a2b8;
         color: white;
         padding: 8px 15px;
         border-radius: 5px;
@@ -182,8 +201,7 @@
     .btn-delete:hover {
         background-color: #c82333 !important;
     }
-    /* ------------------------------------- */
-
+    
     @media (max-width: 600px) {
         .container {
             max-width: 100%;
@@ -208,6 +226,11 @@
             <img src="data:image/png;base64,{{ qr_base64 }}" alt="QR Code" style="width: 200px; height: 200px; margin-top: 10px;">
             <br>
             <button class="presenter-mode-btn" onclick="togglePresenterMode()">Switch to Presenter View</button>
+            
+            <!-- NEW: Close Room Form -->
+            <form id="close-room-form" action="{{ url_for('close_room', code=room_code) }}" method="post">
+                <button type="button" class="btn-close-room" onclick="confirmCloseRoom()">Close Room & Delete All Files</button>
+            </form>
         </div>
         {% endif %}
 
@@ -237,6 +260,17 @@
         const presenterView = document.getElementById('presenter-view');
         const roomCode = "{{ room_code }}";
 
+        // NEW: Double confirmation logic for closing the room
+        function confirmCloseRoom() {
+            const userInput = prompt(`WARNING: This will permanently close the room and delete ALL uploaded files.\n\nTo confirm, please type the room code: ${roomCode}`);
+            
+            if (userInput !== null && userInput.toUpperCase() === roomCode) {
+                document.getElementById('close-room-form').submit();
+            } else if (userInput !== null) {
+                alert("Room code did not match. Room was not closed.");
+            }
+        }
+
         function updateFileLists(files, is_presenter) {
             fileList.innerHTML = '';
             presenterFileList.innerHTML = '';
@@ -245,7 +279,7 @@
             if (filesData.length > 0) {
                 filesData.forEach(file => {
                     const viewUrl = file.file_url; 
-                    const downloadUrl = file.file_url + "?download="; // Forces the browser to download instead of opening
+                    const downloadUrl = file.file_url + "?download=";
 
                     const manageLi = document.createElement('li');
                     
@@ -285,6 +319,14 @@
             try {
                 const response = await fetch(`/files/${roomCode}`);
                 const data = await response.json();
+                
+                // NEW: Detect if room is closed and kick the user
+                if (data.room_exists === false) {
+                    alert("This room has been closed by the presenter.");
+                    window.location.href = "/";
+                    return;
+                }
+                
                 updateFileLists(data.files, data.is_presenter);
             } catch (error) {
                 console.error('Error fetching files:', error);
