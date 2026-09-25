@@ -222,7 +222,7 @@
     <div class="container" id="manage-view">
         <h1>Room Code:</h1>
         
-        <!-- NEW: Inline Copy Button -->
+        <!-- Inline Copy Button -->
         <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
             <p id="room-code-display" style="margin-bottom: 0;">{{ room_code }}</p>
             <button onclick="copyJoinLink()" style="padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Copy Link</button>
@@ -241,7 +241,7 @@
         </div>
         {% endif %}
 
-        <!-- NEW: Drag and Drop Upload Form -->
+        <!-- Drag and Drop Upload Form -->
         <form id="upload-form" action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
             <div class="drop-zone" id="drop-zone">
                 <span class="drop-zone__prompt">Drag & Drop files here<br><br><span style="font-size: 14px; font-weight: normal;">or click to browse</span></span>
@@ -270,7 +270,6 @@
         const presenterView = document.getElementById('presenter-view');
         const roomCode = "{{ room_code }}";
 
-        // NEW: Copy Join Link Function
         function copyJoinLink() {
             const joinUrl = `${window.location.origin}/join?code=${roomCode}`;
             navigator.clipboard.writeText(joinUrl).then(() => {
@@ -281,7 +280,6 @@
             });
         }
 
-        // NEW: Drag and Drop Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const uploadForm = document.getElementById('upload-form');
@@ -318,7 +316,6 @@
             }
         });
 
-        // Existing Functions
         function confirmCloseRoom() {
             const userInput = prompt(`WARNING: This will permanently close the room and delete ALL uploaded files.\n\nTo confirm, please type the room code: ${roomCode}`);
             
@@ -327,6 +324,12 @@
             } else if (userInput !== null) {
                 alert("Room code did not match. Room was not closed.");
             }
+        }
+
+        // NEW: Helper function to check if a file is an image
+        function isImage(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
         }
 
         function updateFileLists(files, is_presenter) {
@@ -339,6 +342,24 @@
                     const viewUrl = file.file_url; 
                     const downloadUrl = file.file_url + "?download=";
 
+                    // NEW: Create a thumbnail preview if it is an image
+                    let fileDisplay = '';
+                    if (isImage(file.filename)) {
+                        fileDisplay = `
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <img src="${viewUrl}" alt="${file.filename}" style="width: 45px; height: 45px; object-fit: cover; border-radius: 5px; border: 1px solid #ddd;">
+                                <span style="word-break: break-all; font-weight: 500; color: #333;">${file.filename}</span>
+                            </div>
+                        `;
+                    } else {
+                        fileDisplay = `
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="width: 45px; height: 45px; background-color: #e9ecef; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #6c757d; font-weight: bold;">FILE</div>
+                                <span style="word-break: break-all; font-weight: 500; color: #333;">${file.filename}</span>
+                            </div>
+                        `;
+                    }
+
                     const manageLi = document.createElement('li');
                     
                     const deleteBtn = is_presenter ? `
@@ -348,7 +369,7 @@
                         </form>` : '';
                     
                     manageLi.innerHTML = `
-                        <span>${file.filename}</span>
+                        ${fileDisplay}
                         <div class="action-buttons">
                             <a href="${viewUrl}" target="_blank" class="btn-view">View</a>
                             <a href="${downloadUrl}" class="btn-download">Download</a>
@@ -359,7 +380,7 @@
 
                     const presenterLi = document.createElement('li');
                     presenterLi.innerHTML = `
-                        <span>${file.filename}</span>
+                        ${fileDisplay}
                         <div class="action-buttons">
                             <a href="${viewUrl}" target="_blank" class="btn-view">View</a>
                             <a href="${downloadUrl}" class="btn-download">Download</a>
