@@ -8,11 +8,21 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, redirect, url_for, request, session, jsonify
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'fallback_secret_key_change_in_production')
+
+# === SECURITY: INITIALIZE RATE LIMITER ===
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 # === SUPABASE CONFIGURATION ===
 url: str = "https://qzpgqlfujfyjfstfxqgj.supabase.co"
@@ -24,11 +34,12 @@ def home():
     return render_template('index.html')
 
 @app.route('/create')
+# Apply a specific rate limit to prevent spamming room creations
+@limiter.limit("10 per hour") 
 def create_room():
     room_code = ''.join(random.choices(string.ascii_uppercase, k=5))
     presenter_key = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
 
-    # Insert into Supabase
     supabase.table('rooms').insert({
         'room_code': room_code, 
         'presenter_key': presenter_key
@@ -39,7 +50,6 @@ def create_room():
 
 @app.route('/room/<code>')
 def room(code):
-    # Check if room exists and get presenter key
     response = supabase.table('rooms').select('presenter_key').eq('room_code', code).execute()
     
     if len(response.data) > 0:
@@ -55,13 +65,15 @@ def room(code):
     qr_img.save(buffer, 'PNG')
     qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
 
-    # Fetch files for this room (fetch all data and keep it as a dictionary)
     files_response = supabase.table('files').select('*').eq('room_code', code).execute()
     room_files = files_response.data
     
     return render_template('room.html', room_code=code, files=room_files, is_presenter=is_presenter, qr_base64=qr_base64)
 
 @app.route('/join', methods=['GET', 'POST'])
+# === SECURITY: BRUTE FORCE PROTECTION ===
+# Allows a maximum of 5 room code guesses per minute per IP address
+@limiter.limit("5 per minute")
 def join_room():
     if request.method == 'POST':
         code = request.form['code'].upper()
@@ -79,9 +91,13 @@ def join_room():
 
     return render_template('join.html', error_message="")
 
+# Handle rate limit exceeded errors gracefully
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template('join.html', error_message="Security trigger: Too many attempts. Please wait 60 seconds and try again."), 429
+
 @app.route('/save_file_record/<code>', methods=['POST'])
 def save_file_record(code):
-    # Check if room exists
     room_check = supabase.table('rooms').select('room_code').eq('room_code', code).execute()
     if len(room_check.data) > 0:
         data = request.json
@@ -93,7 +109,6 @@ def save_file_record(code):
         file_path = f"{code}/{filename}"
         public_url = supabase.storage.from_("filedrop").get_public_url(file_path)
 
-        # Save metadata to Supabase DB
         supabase.table('files').insert({
             'room_code': code,
             'filename': filename,
@@ -116,17 +131,11 @@ def delete_file(code):
     
     if is_presenter:
         filename = request.form['filename']
-        
-        # Get storage path
         file_data = supabase.table('files').select('storage_path').eq('room_code', code).eq('filename', filename).execute()
         
         if len(file_data.data) > 0:
             storage_path = file_data.data[0]['storage_path']
-            
-            # Delete from Storage
             supabase.storage.from_("filedrop").remove([storage_path])
-            
-            # Delete from DB
             supabase.table('files').delete().eq('room_code', code).eq('filename', filename).execute()
         
         return redirect(url_for('room', code=code))
@@ -143,21 +152,15 @@ def close_room(code):
     is_presenter = (session.get('presenter_key') == room_data['presenter_key'])
     
     if is_presenter:
-        # 1. Get all file paths for this room
         files_response = supabase.table('files').select('storage_path').eq('room_code', code).execute()
         storage_paths = [row['storage_path'] for row in files_response.data]
         
-        # 2. Delete all files physically from Supabase Storage
         if storage_paths:
             supabase.storage.from_("filedrop").remove(storage_paths)
             
-        # 3. Delete file metadata from the database
         supabase.table('files').delete().eq('room_code', code).execute()
-        
-        # 4. Delete the room itself
         supabase.table('rooms').delete().eq('room_code', code).execute()
         
-        # Redirect the presenter back to the home page
         return redirect(url_for('home'))
         
     return "Unauthorized access."
@@ -173,7 +176,6 @@ def get_files(code):
         files_response = supabase.table('files').select('filename, file_url').eq('room_code', code).execute()
         return jsonify({'room_exists': True, 'files': files_response.data, 'is_presenter': is_presenter})
         
-    # Tell the frontend the room no longer exists
     return jsonify({'room_exists': False, 'files': [], 'is_presenter': False})
 
 @app.route('/download_file')
@@ -199,7 +201,6 @@ def presenter_view(code):
         room_data = room_check.data[0]
         is_presenter = (session.get('presenter_key') == room_data['presenter_key'])
         
-        # Fetch all file data, keeping the dictionary structure
         files_response = supabase.table('files').select('*').eq('room_code', code).execute()
         files_list = files_response.data
         
@@ -210,25 +211,19 @@ def presenter_view(code):
 @app.route('/cleanup-old-rooms-secret-task')
 def cleanup_old_rooms():
     try:
-        # Calculate the exact time 12 hours ago
         time_threshold = (datetime.now(timezone.utc) - timedelta(hours=12)).isoformat()
-        
-        # Find all rooms created before the 12-hour threshold
         old_rooms = supabase.table('rooms').select('room_code').lt('created_at', time_threshold).execute()
         
         deleted_count = 0
         for room in old_rooms.data:
             code = room['room_code']
             
-            # 1. Find all files associated with the old room
             files_response = supabase.table('files').select('storage_path').eq('room_code', code).execute()
             storage_paths = [row['storage_path'] for row in files_response.data]
             
-            # 2. Delete files from Supabase Storage
             if storage_paths:
                 supabase.storage.from_("filedrop").remove(storage_paths)
                 
-            # 3. Delete from database
             supabase.table('files').delete().eq('room_code', code).execute()
             supabase.table('rooms').delete().eq('room_code', code).execute()
             
