@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room {{ room_code }}</title>
+    <!-- NEW: Supabase JS Library for Realtime WebSockets -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
     body {
         font-family: Arial, sans-serif;
@@ -222,7 +224,6 @@
     <div class="container" id="manage-view">
         <h1>Room Code:</h1>
         
-        <!-- Inline Copy Button -->
         <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
             <p id="room-code-display" style="margin-bottom: 0;">{{ room_code }}</p>
             <button onclick="copyJoinLink()" style="padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Copy Link</button>
@@ -241,7 +242,6 @@
         </div>
         {% endif %}
 
-        <!-- UPDATED: Drag and Drop Upload Form (Action removed so JS can handle it) -->
         <form id="upload-form">
             <div class="drop-zone" id="drop-zone">
                 <span class="drop-zone__prompt">Drag & Drop files here<br><br><span style="font-size: 14px; font-weight: normal;">or click to browse</span></span>
@@ -270,10 +270,26 @@
         const presenterView = document.getElementById('presenter-view');
         const roomCode = "{{ room_code }}";
 
-        // --- DIRECT-TO-STORAGE CONFIGURATION ---
-        // !!! IMPORTANT: Replace this with your actual Supabase anon public key !!!
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q"; 
+        // --- DIRECT-TO-STORAGE & REALTIME CONFIGURATION ---
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q"; // <-- PASTE YOUR KEY HERE
         const SUPABASE_URL = "https://qzpgqlfujfyjfstfxqgj.supabase.co";
+
+        // Initialize Supabase Client for Realtime WebSockets
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // NEW: Realtime Subscription
+        // This listens to the database directly and updates the UI instantly
+        supabase
+            .channel('room-updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'files', filter: `room_code=eq.${roomCode}` }, payload => {
+                console.log('Realtime change detected:', payload);
+                fetchFiles(); // Instantly fetch the updated list
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'rooms', filter: `room_code=eq.${roomCode}` }, payload => {
+                alert("This room has been closed by the presenter.");
+                window.location.href = "/";
+            })
+            .subscribe();
 
         function copyJoinLink() {
             const joinUrl = `${window.location.origin}/join?code=${roomCode}`;
@@ -316,7 +332,6 @@
             }
         });
 
-        // NEW: Direct Upload Function (Bypasses Render server entirely)
         async function handleDirectUpload(file) {
             promptText.innerHTML = `Uploading ${file.name}...`;
             dropZone.style.pointerEvents = "none";
@@ -325,7 +340,6 @@
             const storageApiUrl = `${SUPABASE_URL}/storage/v1/object/filedrop/${filePath}`;
 
             try {
-                // 1. Upload file directly to Supabase
                 const uploadResponse = await fetch(storageApiUrl, {
                     method: 'POST',
                     headers: {
@@ -342,7 +356,6 @@
 
                 promptText.innerHTML = "Saving record...";
 
-                // 2. Tell the Python backend to save the database record
                 const dbResponse = await fetch(`/save_file_record/${roomCode}`, {
                     method: 'POST',
                     headers: {
@@ -357,7 +370,8 @@
 
                 promptText.innerHTML = "Drag & Drop files here<br><br><span style='font-size: 14px; font-weight: normal;'>or click to browse</span>";
                 dropZone.style.pointerEvents = "auto";
-                fetchFiles(); 
+                // Note: We don't need to manually call fetchFiles() here anymore, 
+                // because the Realtime listener will automatically trigger it!
 
             } catch (error) {
                 console.error("Upload error:", error);
@@ -448,13 +462,10 @@
                 const response = await fetch(`/files/${roomCode}`);
                 const data = await response.json();
                 
-                if (data.room_exists === false) {
-                    alert("This room has been closed by the presenter.");
-                    window.location.href = "/";
-                    return;
+                // Room deletion logic is now handled by Realtime listener above
+                if (data.room_exists) {
+                    updateFileLists(data.files, data.is_presenter);
                 }
-                
-                updateFileLists(data.files, data.is_presenter);
             } catch (error) {
                 console.error('Error fetching files:', error);
             }
@@ -470,8 +481,9 @@
             }
         }
 
-        setInterval(fetchFiles, 3000);
-        fetchFiles();
+        // REMOVED: setInterval(fetchFiles, 3000); 
+        // We no longer need to poll the server constantly!
+        fetchFiles(); // Fetch once on load, Realtime handles the rest
     </script>
 </body>
 </html>
