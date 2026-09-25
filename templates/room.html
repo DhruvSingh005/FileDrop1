@@ -241,8 +241,8 @@
         </div>
         {% endif %}
 
-        <!-- Drag and Drop Upload Form -->
-        <form id="upload-form" action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
+        <!-- UPDATED: Drag and Drop Upload Form (Action removed so JS can handle it) -->
+        <form id="upload-form">
             <div class="drop-zone" id="drop-zone">
                 <span class="drop-zone__prompt">Drag & Drop files here<br><br><span style="font-size: 14px; font-weight: normal;">or click to browse</span></span>
                 <input type="file" name="file" class="drop-zone__input" id="file-input" required>
@@ -270,6 +270,11 @@
         const presenterView = document.getElementById('presenter-view');
         const roomCode = "{{ room_code }}";
 
+        // --- DIRECT-TO-STORAGE CONFIGURATION ---
+        // !!! IMPORTANT: Replace this with your actual Supabase anon public key !!!
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q"; 
+        const SUPABASE_URL = "https://qzpgqlfujfyjfstfxqgj.supabase.co";
+
         function copyJoinLink() {
             const joinUrl = `${window.location.origin}/join?code=${roomCode}`;
             navigator.clipboard.writeText(joinUrl).then(() => {
@@ -282,17 +287,9 @@
 
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
-        const uploadForm = document.getElementById('upload-form');
         const promptText = document.querySelector('.drop-zone__prompt');
 
         dropZone.addEventListener('click', () => fileInput.click());
-
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length > 0) {
-                promptText.innerHTML = "Uploading...";
-                uploadForm.submit();
-            }
-        });
 
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -308,13 +305,67 @@
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('drop-zone--over');
-
             if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                promptText.innerHTML = "Uploading...";
-                uploadForm.submit();
+                handleDirectUpload(e.dataTransfer.files[0]);
             }
         });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                handleDirectUpload(fileInput.files[0]);
+            }
+        });
+
+        // NEW: Direct Upload Function (Bypasses Render server entirely)
+        async function handleDirectUpload(file) {
+            promptText.innerHTML = `Uploading ${file.name}...`;
+            dropZone.style.pointerEvents = "none";
+            
+            const filePath = `${roomCode}/${file.name}`;
+            const storageApiUrl = `${SUPABASE_URL}/storage/v1/object/filedrop/${filePath}`;
+
+            try {
+                // 1. Upload file directly to Supabase
+                const uploadResponse = await fetch(storageApiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Content-Type': file.type || 'application/octet-stream'
+                    },
+                    body: file
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error("Failed to upload file to storage.");
+                }
+
+                promptText.innerHTML = "Saving record...";
+
+                // 2. Tell the Python backend to save the database record
+                const dbResponse = await fetch(`/save_file_record/${roomCode}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: file.name })
+                });
+
+                if (!dbResponse.ok) {
+                    throw new Error("Failed to save database record.");
+                }
+
+                promptText.innerHTML = "Drag & Drop files here<br><br><span style='font-size: 14px; font-weight: normal;'>or click to browse</span>";
+                dropZone.style.pointerEvents = "auto";
+                fetchFiles(); 
+
+            } catch (error) {
+                console.error("Upload error:", error);
+                alert("Upload failed. Make sure your bucket allows public INSERT policies.");
+                promptText.innerHTML = "Upload Failed. Click to try again.";
+                dropZone.style.pointerEvents = "auto";
+            }
+        }
 
         function confirmCloseRoom() {
             const userInput = prompt(`WARNING: This will permanently close the room and delete ALL uploaded files.\n\nTo confirm, please type the room code: ${roomCode}`);
@@ -326,7 +377,6 @@
             }
         }
 
-        // NEW: Helper function to check if a file is an image
         function isImage(filename) {
             const ext = filename.split('.').pop().toLowerCase();
             return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
@@ -342,7 +392,6 @@
                     const viewUrl = file.file_url; 
                     const downloadUrl = file.file_url + "?download=";
 
-                    // NEW: Create a thumbnail preview if it is an image
                     let fileDisplay = '';
                     if (isImage(file.filename)) {
                         fileDisplay = `
