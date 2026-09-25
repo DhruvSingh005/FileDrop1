@@ -271,15 +271,14 @@
         const roomCode = "{{ room_code }}";
 
         // --- DIRECT-TO-STORAGE & REALTIME CONFIGURATION ---
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q"; // <-- PASTE YOUR KEY HERE
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6cGdxbGZ1amZ5amZzdGZ4cWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNTUzMDYsImV4cCI6MjEwNTgzMTMwNn0.x8YoHXC1fLz12dqak6DS2xt4r0A-aIcdoQ5dvOPqf7Q";
         const SUPABASE_URL = "https://qzpgqlfujfyjfstfxqgj.supabase.co";
 
-        // Initialize Supabase Client for Realtime WebSockets
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Initialize Supabase Client for Realtime WebSockets (RENAMED to avoid crash)
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // NEW: Realtime Subscription
-        // This listens to the database directly and updates the UI instantly
-        supabase
+        // Realtime Subscription
+        supabaseClient
             .channel('room-updates')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'files', filter: `room_code=eq.${roomCode}` }, payload => {
                 console.log('Realtime change detected:', payload);
@@ -370,8 +369,6 @@
 
                 promptText.innerHTML = "Drag & Drop files here<br><br><span style='font-size: 14px; font-weight: normal;'>or click to browse</span>";
                 dropZone.style.pointerEvents = "auto";
-                // Note: We don't need to manually call fetchFiles() here anymore, 
-                // because the Realtime listener will automatically trigger it!
 
             } catch (error) {
                 console.error("Upload error:", error);
@@ -462,7 +459,6 @@
                 const response = await fetch(`/files/${roomCode}`);
                 const data = await response.json();
                 
-                // Room deletion logic is now handled by Realtime listener above
                 if (data.room_exists) {
                     updateFileLists(data.files, data.is_presenter);
                 }
@@ -481,8 +477,6 @@
             }
         }
 
-        // REMOVED: setInterval(fetchFiles, 3000); 
-        // We no longer need to poll the server constantly!
         fetchFiles(); // Fetch once on load, Realtime handles the rest
     </script>
 </body>
