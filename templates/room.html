@@ -52,7 +52,6 @@
         font-weight: bold;
         color: #007bff;
         letter-spacing: 2px;
-        margin-bottom: 20px;
     }
     .qr-code-section {
         margin-bottom: 20px;
@@ -71,7 +70,6 @@
         background-color: #138496;
     }
     
-    /* --- NEW CLOSE ROOM BUTTON --- */
     .btn-close-room {
         background-color: #dc3545;
         color: white;
@@ -87,33 +85,39 @@
     .btn-close-room:hover {
         background-color: #c82333;
     }
+
+    /* --- DRAG AND DROP STYLES --- */
+    .drop-zone {
+        max-width: 100%;
+        height: 150px;
+        padding: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        cursor: pointer;
+        border: 3px dashed #007bff;
+        border-radius: 10px;
+        background-color: #f8fbff;
+        transition: all 0.2s ease;
+        margin-top: 20px;
+        box-sizing: border-box;
+    }
+    .drop-zone--over {
+        border-style: solid;
+        background-color: #e2f0ff;
+    }
+    .drop-zone__input {
+        display: none;
+    }
+    .drop-zone__prompt {
+        color: #555;
+        font-size: 18px;
+        font-weight: bold;
+        pointer-events: none;
+    }
     /* ----------------------------- */
 
-    form {
-        margin-top: 20px;
-    }
-    input[type="file"] {
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        width: 100%;
-        box-sizing: border-box;
-        margin-bottom: 10px;
-    }
-    button[type="submit"] {
-        padding: 10px 20px;
-        font-size: 16px;
-        background-color: #28a745;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    button[type="submit"]:hover {
-        background-color: #218838;
-    }
     hr {
         border: 0;
         height: 1px;
@@ -146,7 +150,6 @@
         color: #333;
     }
     
-    /* --- ACTION BUTTON STYLES --- */
     .action-buttons {
         display: flex;
         gap: 10px;
@@ -218,7 +221,12 @@
 <body>
     <div class="container" id="manage-view">
         <h1>Room Code:</h1>
-        <p id="room-code-display">{{ room_code }}</p>
+        
+        <!-- NEW: Inline Copy Button -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px;">
+            <p id="room-code-display" style="margin-bottom: 0;">{{ room_code }}</p>
+            <button onclick="copyJoinLink()" style="padding: 8px 12px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Copy Link</button>
+        </div>
 
         {% if is_presenter %}
         <div class="qr-code-section">
@@ -227,16 +235,18 @@
             <br>
             <button class="presenter-mode-btn" onclick="togglePresenterMode()">Switch to Presenter View</button>
             
-            <!-- NEW: Close Room Form -->
             <form id="close-room-form" action="{{ url_for('close_room', code=room_code) }}" method="post">
                 <button type="button" class="btn-close-room" onclick="confirmCloseRoom()">Close Room & Delete All Files</button>
             </form>
         </div>
         {% endif %}
 
-        <form action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" required>
-            <button type="submit">Upload File</button>
+        <!-- NEW: Drag and Drop Upload Form -->
+        <form id="upload-form" action="{{ url_for('upload_file', code=room_code) }}" method="post" enctype="multipart/form-data">
+            <div class="drop-zone" id="drop-zone">
+                <span class="drop-zone__prompt">Drag & Drop files here<br><br><span style="font-size: 14px; font-weight: normal;">or click to browse</span></span>
+                <input type="file" name="file" class="drop-zone__input" id="file-input" required>
+            </div>
         </form>
 
         <hr>
@@ -260,7 +270,55 @@
         const presenterView = document.getElementById('presenter-view');
         const roomCode = "{{ room_code }}";
 
-        // NEW: Double confirmation logic for closing the room
+        // NEW: Copy Join Link Function
+        function copyJoinLink() {
+            const joinUrl = `${window.location.origin}/join?code=${roomCode}`;
+            navigator.clipboard.writeText(joinUrl).then(() => {
+                alert("Join link copied to clipboard!");
+            }).catch(err => {
+                console.error('Failed to copy link: ', err);
+                alert("Failed to copy link. Please check your browser permissions.");
+            });
+        }
+
+        // NEW: Drag and Drop Logic
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadForm = document.getElementById('upload-form');
+        const promptText = document.querySelector('.drop-zone__prompt');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                promptText.innerHTML = "Uploading...";
+                uploadForm.submit();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drop-zone--over');
+        });
+
+        ['dragleave', 'dragend'].forEach(type => {
+            dropZone.addEventListener(type, (e) => {
+                dropZone.classList.remove('drop-zone--over');
+            });
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-zone--over');
+
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                promptText.innerHTML = "Uploading...";
+                uploadForm.submit();
+            }
+        });
+
+        // Existing Functions
         function confirmCloseRoom() {
             const userInput = prompt(`WARNING: This will permanently close the room and delete ALL uploaded files.\n\nTo confirm, please type the room code: ${roomCode}`);
             
@@ -320,7 +378,6 @@
                 const response = await fetch(`/files/${roomCode}`);
                 const data = await response.json();
                 
-                // NEW: Detect if room is closed and kick the user
                 if (data.room_exists === false) {
                     alert("This room has been closed by the presenter.");
                     window.location.href = "/";
