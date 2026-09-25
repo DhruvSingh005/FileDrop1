@@ -79,37 +79,31 @@ def join_room():
 
     return render_template('join.html', error_message="")
 
-@app.route('/upload/<code>', methods=['POST'])
-def upload_file(code):
-    if 'file' not in request.files:
-        return 'No file part'
-    file = request.files['file']
-    if file.filename == '':
-        return 'No selected file'
-    
+@app.route('/save_file_record/<code>', methods=['POST'])
+def save_file_record(code):
     # Check if room exists
     room_check = supabase.table('rooms').select('room_code').eq('room_code', code).execute()
     if len(room_check.data) > 0:
-        file_bytes = file.read()
-        file_path = f"{code}/{file.filename}"
+        data = request.json
+        filename = data.get('filename')
         
-        # Upload to Supabase Storage bucket
-        supabase.storage.from_("filedrop").upload(file_path, file_bytes)
-        
-        # Get the public URL
+        if not filename:
+            return jsonify({"error": "Filename missing"}), 400
+            
+        file_path = f"{code}/{filename}"
         public_url = supabase.storage.from_("filedrop").get_public_url(file_path)
 
         # Save metadata to Supabase DB
         supabase.table('files').insert({
             'room_code': code,
-            'filename': file.filename,
+            'filename': filename,
             'file_url': public_url,
             'storage_path': file_path
         }).execute()
 
-        return redirect(url_for('room', code=code))
+        return jsonify({"status": "success", "file_url": public_url})
 
-    return "Error uploading file. Room not found."
+    return jsonify({"error": "Room not found"}), 404
 
 @app.route('/delete_file/<code>', methods=['POST'])
 def delete_file(code):
