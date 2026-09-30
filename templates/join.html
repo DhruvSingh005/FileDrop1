@@ -11,11 +11,13 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+          navigator.serviceWorker.register("/sw.js");
         });
       }
     </script>
-    <!-- ================================ -->
+    
+    <!-- === QR SCANNER LIBRARY === -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
         body {
@@ -25,8 +27,10 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
         .container {
             text-align: center;
@@ -34,12 +38,17 @@
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
         }
         h1 {
             color: #333;
         }
         .join-form {
             margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
         }
         .join-form input[type="text"] {
             padding: 10px;
@@ -47,33 +56,118 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             text-transform: uppercase;
+            width: 60%;
         }
-        .join-form button {
+        .btn {
             padding: 10px 20px;
             font-size: 16px;
-            background-color: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            transition: background-color 0.2s;
         }
-        .join-form button:hover {
-            background-color: #0056b3;
+        .btn-primary { background-color: #007bff; }
+        .btn-primary:hover { background-color: #0056b3; }
+        
+        .btn-scan {
+            background-color: #28a745;
+            width: 100%;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .btn-scan:hover { background-color: #218838; }
+
+        .divider {
+            margin: 20px 0;
+            color: #888;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+            margin: 0 10px;
         }
         .error {
             color: red;
             margin-top: 10px;
+        }
+        #reader {
+            width: 100%;
+            margin-top: 20px;
+            display: none; /* Hidden until clicked */
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Join a Room</h1>
-        <form class="join-form" action="/join" method="post">
-            <input type="text" name="code" placeholder="Enter Room Code" required maxlength="5" minlength="5">
-            <button type="submit">Join</button>
+        
+        <form class="join-form" action="/join" method="post" id="joinForm">
+            <input type="text" name="code" id="codeInput" placeholder="Enter Code" required maxlength="5" minlength="5">
+            <button type="submit" class="btn btn-primary">Join</button>
         </form>
+
         <p class="error">{{ error_message }}</p>
+
+        <div class="divider">OR</div>
+
+        <button type="button" class="btn btn-scan" id="startScanBtn" onclick="startScanner()">📷 Scan QR Code</button>
+        
+        <!-- The camera feed will appear inside this div -->
+        <div id="reader"></div>
     </div>
+
+    <script>
+        let html5QrcodeScanner = null;
+
+        function startScanner() {
+            const readerDiv = document.getElementById('reader');
+            const scanBtn = document.getElementById('startScanBtn');
+            
+            // Show the camera container and hide the scan button
+            readerDiv.style.display = 'block';
+            scanBtn.style.display = 'none';
+
+            // Initialize the scanner
+            html5QrcodeScanner = new Html5QrcodeScanner(
+                "reader", 
+                { fps: 10, qrbox: {width: 250, height: 250} },
+                /* verbose= */ false
+            );
+
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // The QR code contains a URL like "http://your-app/join?code=ABCDE"
+            // We need to extract just the 5-letter code from it
+            try {
+                let url = new URL(decodedText);
+                let code = url.searchParams.get("code");
+                
+                if (code) {
+                    // Stop the scanner
+                    html5QrcodeScanner.clear();
+                    
+                    // Fill the input and submit the form automatically
+                    document.getElementById('codeInput').value = code;
+                    document.getElementById('joinForm').submit();
+                } else {
+                    alert("Invalid FileDrop QR Code. No room code found.");
+                }
+            } catch (e) {
+                alert("Invalid QR Code format. Please scan a valid FileDrop code.");
+            }
+        }
+
+        function onScanFailure(error) {
+            // This runs continuously while the camera is looking for a code, so we ignore it
+        }
+    </script>
 </body>
 </html>
