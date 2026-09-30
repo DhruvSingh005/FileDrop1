@@ -11,33 +11,70 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}");
+          // Note: Updated back to the root scope "/sw.js" to fix the Android install issue
+          navigator.serviceWorker.register("/sw.js");
         });
       }
     </script>
     <!-- ================================ -->
 
     <style>
+        /* --- CSS VARIABLES FOR DARK MODE --- */
+        :root {
+            --bg-color: #f4f4f4;
+            --container-bg: #fff;
+            --text-color: #333;
+            --text-muted: #666;
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --container-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --text-muted: #aaa;
+        }
+
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
+            transition: background-color 0.3s, color 0.3s;
         }
+
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
         .container {
             text-align: center;
-            background-color: #fff;
+            background-color: var(--container-bg);
             padding: 40px;
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
         }
+        
         h1 {
-            color: #333;
+            color: var(--text-color);
         }
+        
+        p {
+            color: var(--text-muted);
+        }
+
         .btn {
             background-color: #007bff;
             color: white;
@@ -52,6 +89,7 @@
             vertical-align: middle;
             line-height: 1.2;
         }
+        
         .btn:hover {
             background-color: #0056b3;
         }
@@ -75,15 +113,40 @@
             h1 {
                 font-size: 24px;
             }
+            .theme-toggle {
+                top: 10px;
+                right: 10px;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-icon">🌙</button>
+
     <div class="container">
         <h1>Welcome to FileDrop</h1>
         <p>Please choose an option to get started.</p>
         <a href="/create" class="btn">Create Room</a>
         <a href="/join" class="btn">Join Room</a>
     </div>
+
+    <script>
+        // --- THEME LOGIC ---
+        // This checks localStorage instantly when the page loads so the user doesn't get blinded
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        const themeIcon = document.getElementById('theme-icon');
+        if (currentTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            themeIcon.innerText = "☀️";
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            themeIcon.innerText = isDark ? "☀️" : "🌙";
+        }
+    </script>
 </body>
 </html>
